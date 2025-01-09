@@ -6,7 +6,7 @@ Description: >
   Sample SAM Template for order-service-lambda-api-dynamodb
 
 Resources:
-  customer-serviceFunction:
+  CustomerServiceFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
       CodeUri: customer-service
