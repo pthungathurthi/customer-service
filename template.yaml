@@ -18,5 +18,5 @@ Resources:
         OrderEvents:
           Type: Api
           Properties:
-            Path: /orders
+            Path: /customer/orders
             Method: POST
