@@ -1,0 +1,76 @@
+name: Pipeline
+
+on:
+  push:
+    branches:
+      - "master"
+      - "feature**"
+  delete:
+    branches:
+      - "feature**"
+
+env:
+  SAM_TEMPLATE: template.yaml
+  TESTING_STACK_NAME: test
+  TESTING_PIPELINE_EXECUTION_ROLE: arn:aws:iam::183295410578:role/aws-sam-cli-managed-Test-pipe-PipelineExecutionRole-ePk7QoBYur4F
+  TESTING_CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::183295410578:role/aws-sam-cli-managed-Test--CloudFormationExecutionRo-TLnn5kIw3sAi
+  TESTING_ARTIFACTS_BUCKET: aws-sam-cli-managed-test-pipeline--artifactsbucket-dfqhxk914ocm
+  # If there are functions with "Image" PackageType in your template,
+  # uncomment the line below and add "--image-repository ${TESTING_IMAGE_REPOSITORY}" to
+  # testing "sam package" and "sam deploy" commands.
+  # TESTING_IMAGE_REPOSITORY = '0123456789.dkr.ecr.region.amazonaws.com/repository-name'
+  TESTING_REGION: ap-southeast-2
+  PROD_STACK_NAME: prod
+  PROD_PIPELINE_EXECUTION_ROLE: arn:aws:iam::183295410578:role/aws-sam-cli-managed-Test-pipe-PipelineExecutionRole-ePk7QoBYur4F
+  PROD_CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::183295410578:role/aws-sam-cli-managed-Test--CloudFormationExecutionRo-TLnn5kIw3sAi
+  PROD_ARTIFACTS_BUCKET: aws-sam-cli-managed-test-pipeline--artifactsbucket-dfqhxk914ocm
+  # If there are functions with "Image" PackageType in your template,
+  # uncomment the line below and add "--image-repository ${PROD_IMAGE_REPOSITORY}" to
+  # prod "sam package" and "sam deploy" commands.
+  # PROD_IMAGE_REPOSITORY = '0123456789.dkr.ecr.region.amazonaws.com/repository-name'
+  PROD_REGION: ap-southeast-2
+
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  test:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          # trigger the tests here
+
+  build-and-deploy-feature:
+    # this stage is triggered only for feature branches (feature*),
+    # which will build the stack and deploy to a stack named with branch name.
+    # https://github.com/actions/setup-python
+    # https://github.com/aws-actions/configure-aws-credentials#notice-node12-deprecation-warning
+    if: startsWith(github.ref, 'refs/heads/feature')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+      - run: sam build --template ${SAM_TEMPLATE} --use-container
+
+      - name: Assume the testing pipeline user role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.TESTING_REGION }}
+          role-to-assume: ${{ env.TESTING_PIPELINE_EXECUTION_ROLE }}
+          role-session-name: feature-deployment
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+
+      - name: Deploy to feature stack in the testing account
+        shell: bash
+        run: |
+          sam deploy --stack-name $(echo ${GITHUB_REF##*/} | tr -cd '[a-zA-Z0-9-]') \
+            --capabilities CAPABILITY_IAM \
+            --region ${TESTING_REGION} \
+            --s3-bucket ${TESTING_ARTIFACTS_BUCKET} \
+            --no-fail-on-empty-changeset \
+            --role-arn ${TESTING_CLOUDFORMATION_EXECUTION_ROLE}
