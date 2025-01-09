@@ -1,4 +1,4 @@
-package helloworld;
+package com.praveen;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
